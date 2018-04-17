@@ -34,7 +34,7 @@ def do_task(data):
   except KeyboardInterrupt:
     # This is interactive so we want to let it float
     raise
-  except:
+  except BaseException:
     # Everything else: We want to pass back across the network
     (_, exc_value, exc_trace) = sys.exc_info()
     exc_trace = traceback.format_tb(exc_trace)

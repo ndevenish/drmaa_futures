@@ -46,7 +46,11 @@ def slave(url=None, id=None, timeout=None):
   try:
     yield proc
   finally:
-    proc.kill()
+    try:
+      proc.kill()
+    except OSError:
+      # On python2 trying to kill something that has just died seems to error
+      pass
 
 def test_launch_slave_subprocess():
   slave = subprocess.Popen([sys.executable, "-m", "drmaa_futures", "--help"])

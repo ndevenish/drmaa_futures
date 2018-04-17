@@ -5,6 +5,7 @@
 
 from __future__ import print_function
 
+import os
 import sys
 import time
 import pytest
@@ -18,14 +19,30 @@ from drmaa_futures.slave import run_slave
 import zmq
 
 @contextmanager
+def server(url=None):
+  url = url or "tcp://127.0.0.1:5555"
+  c = zmq.Context()
+  socket = c.socket(zmq.REP)
+  socket.bind("tcp://127.0.0.1:5555")
+  try:
+    yield socket
+  finally:
+    socket.close()
+    c.term()
+
+@contextmanager
 def slave(url=None, id=None, timeout=None):
+  # We need to update the environment to include this file, so that we can unpickle it's functions
+  new_env = dict(os.environ)
+  new_env["PYTHONPATH"] = ":".join(new_env.get("PYTHONPATH", "").split(":") + [os.path.dirname(__file__)])
+
   url = url or "tcp://127.0.0.1:5555"
   id = id if id is not None else "0"
   """Run a slave as a context manager"""
   # proc = Process(target=run_slave, args=("tcp://127.0.0.1:5555", "0"))
   # proc.start()
   timeoutl = [] if timeout is None else ["--timeout={}".format(timeout)]
-  proc = subprocess.Popen([sys.executable, "-m", "drmaa_futures", "-v", "slave"] + timeoutl + [url, id])
+  proc = subprocess.Popen([sys.executable, "-m", "drmaa_futures", "-v", "slave"] + timeoutl + [url, id], env=new_env)
   try:
     yield proc
   finally:
@@ -36,23 +53,17 @@ def test_launch_slave_subprocess():
   assert slave.wait() == 0
 
 def test_slave_hello():
-  c = zmq.Context()
-  socket = c.socket(zmq.REP)
-  socket.bind("tcp://127.0.0.1:5555")
-  socket.RCVTIMEO=200
-  with slave():
+  with server() as socket, slave():
+    socket.RCVTIMEO=200
     assert socket.recv().decode("utf-8") == "HELO IAM 0"
     socket.send(b"HAY")
     time.sleep(0.2)
 
 def test_slave_timeout():
   """Test that the slave times out whilst waiting with nothing to do"""
-  c = zmq.Context()
-  socket = c.socket(zmq.REP)
-  socket.bind("tcp://127.0.0.1:5555")
-  socket.RCVTIMEO=200
   test_timeout = 3
-  with slave(timeout=test_timeout) as proc:
+  with server() as socket, slave(timeout=test_timeout) as proc:
+    socket.RCVTIMEO=200
     start = time.time()
     sent = 0
     # Do hello negotiation
@@ -76,12 +87,8 @@ def _basic_running_timer():
   return time.time()-start
 
 def test_basic_slave_quit():
-  c = zmq.Context()
-  socket = c.socket(zmq.REP)
-  socket.bind("tcp://127.0.0.1:5555")
-  socket.RCVTIMEO=5000
-  # test_timeout = 3
-  with slave() as proc:
+  with server() as socket, slave() as proc:
+    socket.RCVTIMEO=5000
     socket.recv()
     socket.send(b"HAY")
     assert socket.recv().startswith(b"IZ BORED")
@@ -90,12 +97,8 @@ def test_basic_slave_quit():
     assert proc.poll() == 0
 
 def test_basic_slave_task():
-  c = zmq.Context()
-  socket = c.socket(zmq.REP)
-  socket.bind("tcp://127.0.0.1:5555")
-  socket.RCVTIMEO=5000
-  # test_timeout = 3
-  with slave() as proc:
+  with server() as socket, slave() as proc:
+    socket.RCVTIMEO=5000
     # start = time.time()
     # sent = 0
     # Do hello negotiation

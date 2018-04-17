@@ -1,5 +1,4 @@
 # coding: utf-8
-
 """
 Running a slave instance.
 """
@@ -12,11 +11,14 @@ import sys
 import logging
 logger = logging.getLogger(__name__)
 
+
 class UnpickleableError(Exception):
   pass
 
+
 class JobSystemExit(Exception):
   pass
+
 
 def do_task(data):
   """Do a task, as specified in a pickle bundle.
@@ -38,7 +40,7 @@ def do_task(data):
     # Everything else: We want to pass back across the network
     (_, exc_value, exc_trace) = sys.exc_info()
     exc_trace = traceback.format_tb(exc_trace)
-    # We don't want to pick up a SystemExit here and propogate it on the other side
+    # We don't want to propagate a SystemExit to the other side
     if isinstance(exc_value, SystemExit):
       exc_value = JobSystemExit()
     # Be careful - we might not be able to pickle the exception?? Go to lengths
@@ -46,8 +48,10 @@ def do_task(data):
     try:
       pickle.dumps(exc_value)
     except pickle.PicklingError:
-      exc_value = UnpickleableError("{}: {}".format(str(type(exc_value)), str(exc_value)))
+      exc_value = UnpickleableError("{}: {}".format(
+          str(type(exc_value)), str(exc_value)))
     return b"ONO " + pickle.dumps((task_id, exc_trace, exc_value))
+
 
 def run_slave(server_url, worker_id, timeout=30):
   """Run a slave instance and connect it to a specific master URL.
@@ -56,21 +60,23 @@ def run_slave(server_url, worker_id, timeout=30):
   :param timeout: The time (in seconds) to wait with no jobs before terminating
   """
   try:
-    logger.debug("Running slave {} connect to {}".format(worker_id, server_url))
+    logger.debug("Running slave {} connect to {}".format(
+        worker_id, server_url))
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.RCVTIMEO=int(1000*timeout)
+    socket.RCVTIMEO = int(1000 * timeout)
     logger.debug("Connecting")
     socket.connect(server_url)
     logger.debug("Sending hello")
     socket.send(b"HELO IAM " + worker_id.encode("utf-8"))
     logger.debug("Awaiting confirmation of hello recieved")
     assert socket.recv() == b"HAY"
-    logger.debug("Got hello. Going into task loop with timeout {}s".format(timeout))
+    logger.debug(
+        "Got hello. Going into task loop with timeout {}s".format(timeout))
 
     # If waiting for the whole timeout, then stop waiting
     last_job = time.time()
-    while time.time()-last_job < timeout:
+    while time.time() - last_job < timeout:
       logger.debug("Asking for a task")
       socket.send("IZ BORED {}".format(worker_id).encode("UTF-8"))
       try:
@@ -79,7 +85,7 @@ def run_slave(server_url, worker_id, timeout=30):
         assert reply.startswith(b"PLZ")
         if reply == b"PLZ WAIT":
           logger.debug("No tasks available. Trying again in a few seconds.")
-          time.sleep(min(timeout/2.0, 5))
+          time.sleep(min(timeout / 2.0, 5))
         elif reply == b"PLZ GOWAY":
           logger.debug("Got quit signal. ending main loop.")
           break
@@ -92,7 +98,7 @@ def run_slave(server_url, worker_id, timeout=30):
       except zmq.error.Again:
         # If we hit the send/recieve timeout, just wait and try again
         pass
-    if time.time()-last_job >= timeout:
+    if time.time() - last_job >= timeout:
       logger.debug("Timed out while waiting for tasks")
 
   except zmq.error.Again:
@@ -104,6 +110,7 @@ def run_slave(server_url, worker_id, timeout=30):
     logger.debug("Closing context")
     context.term()
   logger.debug("Slave completed.")
+
 
 # Messaging protocol:
 # Sent                    Recieved      Action

@@ -59,6 +59,7 @@ def run_slave(server_url, worker_id, timeout=30):
     logger.debug("Running slave {} connect to {}".format(worker_id, server_url))
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
+    socket.RCVTIMEO=int(1000*timeout)
     logger.debug("Connecting")
     socket.connect(server_url)
     logger.debug("Sending hello")
@@ -68,7 +69,6 @@ def run_slave(server_url, worker_id, timeout=30):
     logger.debug("Got hello. Going into task loop with timeout {}s".format(timeout))
 
     # If waiting for the whole timeout, then stop waiting
-    socket.RCVTIMEO=int(1000*timeout)
     last_job = time.time()
     while time.time()-last_job < timeout:
       logger.debug("Asking for a task")
@@ -95,6 +95,9 @@ def run_slave(server_url, worker_id, timeout=30):
     if time.time()-last_job >= timeout:
       logger.debug("Timed out while waiting for tasks")
 
+  except zmq.error.Again:
+    logger.debug("Timed out waiting for handshake.")
+    sys.exit(1)
   finally:
     logger.debug("Closing socket")
     socket.close()

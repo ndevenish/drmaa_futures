@@ -58,7 +58,7 @@ def test_launch_slave_subprocess():
 
 def test_slave_hello():
   with server() as socket, slave():
-    socket.RCVTIMEO=200
+    socket.RCVTIMEO=500
     assert socket.recv().decode("utf-8") == "HELO IAM 0"
     socket.send(b"HAY")
     time.sleep(0.2)
@@ -67,7 +67,7 @@ def test_slave_timeout():
   """Test that the slave times out whilst waiting with nothing to do"""
   test_timeout = 3
   with server() as socket, slave(timeout=test_timeout) as proc:
-    socket.RCVTIMEO=200
+    socket.RCVTIMEO=500
     start = time.time()
     sent = 0
     # Do hello negotiation

@@ -11,7 +11,8 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ["drmaa", "pyzmq", "futures;python_version<\"3\"", "dill"]
+requirements = ["drmaa", "pyzmq", "futures;python_version<\"3\"",
+  "dill", "six", "enum34;python_version<\"3\""]
 
 setup_requirements = ['pytest-runner', ]
 

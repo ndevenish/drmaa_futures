@@ -102,6 +102,8 @@ def run_slave(server_url, worker_id, timeout=30):
         # If we hit the send/recieve timeout, just wait and try again
         pass
     if time.time() - last_job >= timeout:
+      socket.send(b"IGIVEUP " + worker_id.encode("utf-8"))
+      socket.recv()
       logger.debug("Timed out while waiting for tasks")
 
   except zmq.error.Again:
@@ -124,3 +126,4 @@ def run_slave(server_url, worker_id, timeout=30):
 #                         PLZ DO {task} Hand off task to runner
 # YAY {result}            THX           Task succeeded with result data
 # ONO {result}            THX           Task failed - with exception data
+# IGIVEUP {id}            BYE           Quitting; given up with processing

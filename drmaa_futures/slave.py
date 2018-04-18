@@ -31,12 +31,14 @@ def do_task(data):
     logger.debug("Running task with ID {}".format(task_id))
     # Run whatever task we've been given
     result = task_function()
+    logger.debug("Completed task")
     # An error pickling here counts as a job failure
     return b"YAY " + pickle.dumps((task_id, result))
   except KeyboardInterrupt:
     # This is interactive so we want to let it float
     raise
   except BaseException:
+    logger.debug("Exception processing task")
     # Everything else: We want to pass back across the network
     (_, exc_value, exc_trace) = sys.exc_info()
     exc_trace = traceback.format_tb(exc_trace)
@@ -91,6 +93,7 @@ def run_slave(server_url, worker_id, timeout=30):
           break
         elif reply.startswith(b"PLZ DO"):
           result = do_task(reply[len(b"PLZ DO "):])
+          logger.debug("Sending result")
           socket.send(result)
           # Await the ok
           assert socket.recv() == b"THX"

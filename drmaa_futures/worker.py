@@ -6,7 +6,7 @@ Classes and code to manage and interact with worker processes
 
 import os
 import sys
-
+from enum import Enum
 import drmaa
 
 import logging
@@ -52,7 +52,7 @@ class Worker(object):
 
     :param WorkerState new: The new state to transition to.
     """
-    if not new in WorkerState.mapping[self.state]:
+    if new not in WorkerState.mapping[self.state]:
       logger.warn("Invalid state transition for worker {}: {} → {}".format(
           self.id, self.state, new))
     self.state = new

@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 
+from dill import pickle
 import drmaa
 from six.moves.queue import Queue
 import zmq
@@ -68,7 +69,7 @@ class ZeroMQListener(threading.Thread):
   def run(self):
     self._run = True
     self._context = zmq.Context()
-    self._socket = self._context.socket(zmg.REP)
+    self._socket = self._context.socket(zmq.REP)
     self._socket.RCVTIMEO = 200
     while self._run:
       try:
@@ -91,9 +92,9 @@ class ZeroMQListener(threading.Thread):
             self._worker_given_job(worker, job.id)
             logger.debug("Worker {} given task {}".format(worker, job.id))
         elif req.startswith(b"YAY"):
-          self._complete_task(res[4:])
+          self._complete_task(req[4:])
         elif req.startswith(b"ONO"):
-          self._fail_task(res[4:])
+          self._fail_task(req[4:])
         elif req.startswith(b"IGIVEUP"):
           worker = req[len(b"IGIVEUP "):].decode("utf-8")
           self._socket.send(b"BYE")
@@ -112,7 +113,7 @@ class ZeroMQListener(threading.Thread):
 
   def _worker_handshake(self, worker_id):
     """A Worker has said hello. Change it's state and make sure it's known."""
-    if not worker_id in self._workers:
+    if worker_id not in self._workers:
       logger.warn("Handshake from unregistered worker {}".format(worker_id))
       self.add_worker(worker_id)
     worker = self._workers[worker_id]
@@ -122,7 +123,7 @@ class ZeroMQListener(threading.Thread):
 
   def _worker_waiting(self, worker_id):
     """A worker is awaiting a new job"""
-    if not worker_id in self._workers:
+    if worker_id not in self._workers:
       logger.error(
           "Worker entering wait state, but unknown?! ({})".format(worker_id))
       self.add_worker(worker_id)
@@ -132,7 +133,7 @@ class ZeroMQListener(threading.Thread):
 
   def _worker_given_job(self, worker_id, job_id):
     """A worker has been given a job"""
-    if not worker_id in self._workers:
+    if worker_id not in self._workers:
       logger.error("Worker given job, but unknown?! ({})".format(worker_id))
       self.add_worker(worker_id)
     worker = self._workers[worker_id]

@@ -5,10 +5,6 @@ Classes and code to manage and interact with worker processes
 
 from enum import Enum
 import logging
-import os
-import sys
-
-import drmaa
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +15,8 @@ class WorkerState(Enum):
   STARTED = 2
   WAITING = 3
   RUNNING = 4
-  ENDED = 5
+  TASKCOMPLETE = 5
+  ENDED = 6
 
 
 # Table of possible worker state transitions. Used to detect possible
@@ -61,21 +58,21 @@ class Worker(object):
           self.id, self.state, new))
     self.state = new
 
-  @classmethod
-  def launch(cls, pool, timeout=None):
-    jt = pool.session.createJobTemplate()
-    jt.remoteCommand = sys.executable
+  # @classmethod
+  # def launch(cls, pool, timeout=None):
+  #   jt = pool.session.createJobTemplate()
+  #   jt.remoteCommand = sys.executable
 
-    # Build a copy of environ with a backed up LD_LIBRARY_PATH - SGE
-    # disallows passing of this path through but we probably need it
-    env = dict(os.environ)
-    env["_LD_LIBRARY_PATH"] = env.get("LD_LIBRARY_PATH", "")
-    jt.jobEnvironment = env
+  #   # Build a copy of environ with a backed up LD_LIBRARY_PATH - SGE
+  #   # disallows passing of this path through but we probably need it
+  #   env = dict(os.environ)
+  #   env["_LD_LIBRARY_PATH"] = env.get("LD_LIBRARY_PATH", "")
+  #   jt.jobEnvironment = env
 
-    # If we need to pass a timeout parameter
-    timeoutl = [] if timeout is None else ["--timeout={}".format(timeout)]
-    # Work out a unique worker_if
-    worker_id = pool.get_new_worker_id()
+  #   # If we need to pass a timeout parameter
+  #   timeoutl = [] if timeout is None else ["--timeout={}".format(timeout)]
+  #   # Work out a unique worker_if
+  #   worker_id = pool.get_new_worker_id()
 
-    # jt.args = ["-mdrmaa_futures", "-v", "slave"
-    #            ] + timeoutl + [host_url, _worker_id]
+  #   # jt.args = ["-mdrmaa_futures", "-v", "slave"
+  #   #            ] + timeoutl + [host_url, _worker_id]

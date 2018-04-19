@@ -6,6 +6,7 @@ good-names=logger,id,
 
 [MESSAGES CONTROL]
 disable=logging-format-interpolation,
+        too-few-public-methods,
 
 [TYPECHECK]
 ignored-modules=zmq

@@ -47,7 +47,7 @@ if __name__ == "__main__":
   backup_path = os.environ.get("_LD_LIBRARY_PATH", "").split(":")
   if backup_path:
     logger.debug("Restoring backup LD_LIBRARY_PATH")
-    new_path = backup_path + [x for x in library_path if not x in backup_path]
+    new_path = backup_path + [x for x in library_path if x not in backup_path]
     os.environ["LD_LIBRARY_PATH"] = ":".join(new_path)
 
   logger.info("Starting slave node with master {}".format(args.url))

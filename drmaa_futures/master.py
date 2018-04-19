@@ -125,6 +125,12 @@ class ZeroMQListener(object):
       self._socket.bind(endpoint)
       self.endpoint = endpoint
 
+  @property
+  def active_workers(self):
+    """Gives a count of the number of currently known active workers"""
+    return len(
+        [x for x in self._workers.values() if x.state != WorkerState.ENDED])
+
   def __exit__(self, exc_type, exc_value, traceback):
     """Ensure we shutdown properly when leaving as a context."""
     self.shutdown()
@@ -141,7 +147,6 @@ class ZeroMQListener(object):
     self._task_count += 1
     # Create the task item
     task = Task(taskid, func, *args, **kwargs)
-    task.id = taskid
     self._tasks[taskid] = task
     # Once added to the queue, only the update thread may touch it
     self._work_queue.put(taskid)
@@ -191,13 +196,17 @@ class ZeroMQListener(object):
       """Decode the message data as a worker ID"""
       return self._workers[data.decode("utf-8")]
 
+    def decode_pickle(data):
+      logger.debug("Recieved %d byte result" % len(data))
+      return pickle.loads(data)
+
     # Table of possible message beginnings, the functions to decode any
     # attached data, and the functions to then handle the request
     potential_messages = {
         b"HELO IAM": (decode, self._worker_handshake),
         b"IZ BORED": (decode_worker, self._worker_waiting),
-        b"YAY": (pickle.loads, self._complete_task),
-        b"ONO": (pickle.loads, self._fail_task),
+        b"YAY": (decode_pickle, self._complete_task),
+        b"ONO": (decode_pickle, self._fail_task),
         b"IGIVEUP": (decode_worker, self._worker_quitting)
     }
     # Find the message in the table
@@ -233,7 +242,7 @@ class ZeroMQListener(object):
       return b"PLZ WAIT"
 
     worker.state_change(WorkerState.RUNNING)
-    worker.tasks.append(task)
+    worker.tasks.add(task)
     assert task.worker is None, "Attempting to give out duplicate tasks"
     task.worker = worker
     logger.debug("Giving worker %s task %s (%d bytes)", worker.id, task.id,
@@ -256,12 +265,14 @@ class ZeroMQListener(object):
         if task.future.set_running_or_notify_cancel():
           # This task isn't cancelled, and has been set as running
           return self._tasks[task_id]
+        else:
+          logger.debug("Task %s was cancelled before running", task.id)
 
   def _complete_task(self, data):
     """A worker sent us a message with a successful task."""
     (task_id, result) = data
     task = self._tasks[task_id]
-    worker = self._workers[task.worker_id]
+    worker = task.worker
     logger.debug("Worker {} succeeded in {}".format(worker.id, task.id))
     worker.state_change(WorkerState.TASKCOMPLETE)
     worker.last_seen = time.time()
@@ -272,6 +283,7 @@ class ZeroMQListener(object):
     task.worker = None
     del self._tasks[task_id]
     self._work_queue.task_done()
+    return b"THX"
 
   def _fail_task(self, data):
     """A worker sent us a message with a failed task."""
@@ -290,11 +302,12 @@ class ZeroMQListener(object):
     task.worker = None
     del self._tasks[task_id]
     self._work_queue.task_done()
+    return b"THX"
 
   @staticmethod
   def _worker_quitting(worker):
     """A worker has notified us that it is quitting."""
-    logger.debug("Worker %s self-quitting", worker)
+    logger.debug("Worker %s self-quitting", worker.id)
     worker.state_change(WorkerState.ENDED)
     worker.last_seen = time.time()
     return b"BYE"

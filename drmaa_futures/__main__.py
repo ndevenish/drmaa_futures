@@ -82,7 +82,10 @@ def _run_main():
   logger.info("Starting slave node {} with master {}".format(
       args.id, args.url))
   from drmaa_futures.slave import run_slave
-  run_slave(args.url, args.id, timeout=args.timeout)
+  try:
+    run_slave(args.url, args.id, timeout=args.timeout)
+  except KeyboardInterrupt:
+    pass
 
 
 if __name__ == "__main__":

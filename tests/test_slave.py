@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import pytest
+import signal
 import subprocess
 from contextlib import contextmanager
 import dill as pickle # Allow e.g. pickling of lambdas
@@ -48,7 +49,9 @@ def slave(url=None, id="0", timeout=None):
     yield proc
   finally:
     try:
-      proc.kill()
+      # Kill in a gentle way
+      os.kill(proc.pid, signal.SIGINT)
+      proc.wait()
     except OSError:
       # On python2 trying to kill something that has just died seems to error
       pass

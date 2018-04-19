@@ -77,7 +77,10 @@ def run_slave(server_url, worker_id, timeout=30):
     assert socket.recv() == b"HAY"
     logger.debug(
         "Got hello. Going into task loop with timeout {}s".format(timeout))
-
+  except zmq.error.Again:
+    logger.debug("Timed out waiting for handshake.")
+    sys.exit(1)
+  else:
     # If waiting for the whole timeout, then stop waiting
     last_job = time.time()
     while time.time() - last_job < timeout:
@@ -107,10 +110,6 @@ def run_slave(server_url, worker_id, timeout=30):
       socket.send(b"IGIVEUP " + worker_id.encode("utf-8"))
       socket.recv()
       logger.debug("Timed out while waiting for tasks")
-
-  except zmq.error.Again:
-    logger.debug("Timed out waiting for handshake.")
-    sys.exit(1)
   finally:
     logger.debug("Closing socket")
     socket.close()

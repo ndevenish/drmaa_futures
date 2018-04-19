@@ -3,21 +3,22 @@
 Running a slave instance.
 """
 
-import zmq
-import dill as pickle
 import time
 import traceback
 import sys
+
+import dill as pickle
+import zmq
+
 import logging
 logger = logging.getLogger(__name__)
 
-
 class UnpickleableError(Exception):
-  pass
+  """Represent an error attempting to pickle the result of a task"""
 
 
-class JobSystemExit(Exception):
-  pass
+class TaskSystemExit(Exception):
+  """For when the task raised a SystemExit exception, trying to quit"""
 
 
 def do_task(data):
@@ -44,7 +45,7 @@ def do_task(data):
     exc_trace = traceback.format_tb(exc_trace)
     # We don't want to propagate a SystemExit to the other side
     if isinstance(exc_value, SystemExit):
-      exc_value = JobSystemExit()
+      exc_value = TaskSystemExit()
     # Be careful - we might not be able to pickle the exception?? Go to lengths
     # to make sure that we pass something sensible back
     try:

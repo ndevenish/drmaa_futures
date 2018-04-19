@@ -1,5 +1,9 @@
 # coding: utf-8
 
+"""
+Classes and code to manage and interact with worker processes
+"""
+
 import os
 import sys
 
@@ -69,5 +73,5 @@ class Worker(object):
     # Work out a unique worker_if
     worker_id = pool.get_new_worker_id()
 
-    jt.args = ["-mdrmaa_futures", "-v", "slave"
-               ] + timeoutl + [host_url, _worker_id]
+    # jt.args = ["-mdrmaa_futures", "-v", "slave"
+    #            ] + timeoutl + [host_url, _worker_id]

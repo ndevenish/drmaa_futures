@@ -1,0 +1,11 @@
+[FORMAT]
+indent-string='  '
+
+[BASIC]
+good-names=logger,
+
+[MESSAGES CONTROL]
+disable=logging-format-interpolation,
+
+[TYPECHECK]
+ignored-modules=zmq

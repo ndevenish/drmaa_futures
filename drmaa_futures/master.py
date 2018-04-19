@@ -4,6 +4,7 @@ Contains the master control for ZeroMQ communication.
 """
 
 from concurrent.futures import Future
+from enum import Enum
 import logging
 import socket
 import time
@@ -11,8 +12,6 @@ import time
 import dill as pickle
 from six.moves import queue, urllib
 import zmq
-
-from .worker import Worker, WorkerState
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +38,56 @@ class Task(object):
   def id(self):
     """Get the task ID (read-only)"""
     return self._id
+
+
+class WorkerState(Enum):
+  """States to track the worker lifecycle"""
+  UNKNOWN = 1
+  STARTED = 2
+  WAITING = 3
+  RUNNING = 4
+  TASKCOMPLETE = 5
+  ENDED = 6
+
+
+# Table of possible worker state transitions. Used to detect possible
+# errors where we've missed/misprogrammed a change
+WorkerState.mapping = {
+    WorkerState.UNKNOWN: {WorkerState.STARTED},
+    WorkerState.STARTED: {WorkerState.WAITING},
+    WorkerState.WAITING:
+    {WorkerState.RUNNING, WorkerState.ENDED, WorkerState.WAITING},
+    WorkerState.RUNNING: {WorkerState.TASKCOMPLETE},
+    WorkerState.TASKCOMPLETE: {WorkerState.WAITING},
+    WorkerState.ENDED: set(),
+}
+
+
+class Worker(object):
+  """Represents a remote worker instance"""
+
+  def __init__(self, workerid):
+    """Initialise a Worker instance.
+
+    :param str workerid: An identifier for the worker this represents
+    """
+    self.id = workerid
+    self.tasks = set()
+    self.last_seen = None
+    self.state = WorkerState.UNKNOWN
+
+  def state_change(self, new):
+    """Change the worker state.
+
+    Validates against known transitions. If the state change is invalid, then a
+    warning will be printed to the log, but the state change will proceed.
+
+    :param WorkerState new: The new state to transition to.
+    """
+    if new not in WorkerState.mapping[self.state]:
+      logger.warning("Invalid state transition for worker {}: {} → {}".format(
+          self.id, self.state, new))
+    self.state = new
 
 
 class ZeroMQListener(object):
@@ -131,6 +180,7 @@ class ZeroMQListener(object):
     :returns:   The message to send back to the worker
     :rtype byte:
     """
+
     # The first time we encounter a worker it's not known
     def decode(data):
       """Decode the message data as a string"""

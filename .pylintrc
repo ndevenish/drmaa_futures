@@ -2,7 +2,7 @@
 indent-string='  '
 
 [BASIC]
-good-names=logger,
+good-names=logger,id,
 
 [MESSAGES CONTROL]
 disable=logging-format-interpolation,

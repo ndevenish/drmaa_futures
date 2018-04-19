@@ -57,7 +57,7 @@ class Worker(object):
     :param WorkerState new: The new state to transition to.
     """
     if new not in WorkerState.mapping[self.state]:
-      logger.warn("Invalid state transition for worker {}: {} → {}".format(
+      logger.warning("Invalid state transition for worker {}: {} → {}".format(
           self.id, self.state, new))
     self.state = new
 

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class Task(object):
   """Represents a task for workers to do"""
 
-  def __init__(self, function, args, kwargs, task_id):
+  def __init__(self, function, args, kwargs, id):
     """Initialise a Task
 
     :param Callable function: The function to run on the remote host
@@ -29,7 +29,7 @@ class Task(object):
     :param dict kwargs:       Keyword arguments to pass to the function
     :param taskid:            An identifier for the new task
     """
-    self._id = task_id
+    self._id = id
     self.future = Future()
     self.worker = None
     # Serialize this function now, to preserve anything the user might
@@ -97,20 +97,21 @@ class ZeroMQListener(object):
     self._tasks[taskid] = task
     # Once added to the queue, only the update thread may touch it
     self._work_queue.put(taskid)
-    return item.future
+    return task.future
 
   def _add_worker(self, worker_id):
     """Register a worker to the manager."""
     if worker_id in self._workers:
-      logger.warn("Trying to add worker {} twice?".format(worker_id))
+      logger.warning("Trying to add worker {} twice?".format(worker_id))
     else:
       self._workers[worker_id] = Worker(worker_id)
     return self._workers[worker_id]
 
   def process_messages(self):
+    """Process any messages that might have arrived."""
     try:
       req = self._socket.recv()
-      self._socket.send(_process_request(req))
+      self._socket.send(self._process_request(req))
     except zmq.error.Again:
       # We hit a timeout. Just keep going
       pass
@@ -139,7 +140,7 @@ class ZeroMQListener(object):
     # attached data, and the functions to then handle the request
     potential_messages = {
         b"HELO IAM": (decode, self._worker_handshake),
-        b"IZ BORED": (decode_worker, self._workers_waiting),
+        b"IZ BORED": (decode_worker, self._worker_waiting),
         b"YAY": (pickle.loads, self._complete_task),
         b"ONO": (pickle.loads, self._fail_task),
         b"IGIVEUP": (decode_worker, self._worker_quitting)
@@ -150,13 +151,13 @@ class ZeroMQListener(object):
       if request.startswith(message):
         data = processor(request[len(message) + 1:])
         return function(data)
-    assert False, "Could not match message {}".format(message)
+    raise RuntimeError("Could not match message {}".format(request[:10]))
 
   def _worker_handshake(self, worker_id):
     """A Worker has said hello. Change it's state and make sure it's known."""
     logger.info("Got handshake from worker %s", worker_id)
     if worker_id in self._workers:
-      logger.warn("Handshake from already registered worker %s???", worker_id)
+      logger.warning("Handshake from already registered worker %s???", worker_id)
       self._add_worker(worker_id)
     worker = self._workers[worker_id]
     # Register that we now have seen this worker
@@ -212,7 +213,7 @@ class ZeroMQListener(object):
     worker.tasks.remove(task)
     task.worker = None
     del self._tasks[task_id]
-    self._tasks.task_done()
+    self._work_queue.task_done()
 
   def _fail_task(self, data):
     """A worker sent us a message with a failed task."""
@@ -230,11 +231,12 @@ class ZeroMQListener(object):
     worker.tasks.remove(task)
     task.worker = None
     del self._tasks[task_id]
-    self._tasks.task_done()
+    self._work_queue.task_done()
 
-  def _worker_quitting(self, worker):
+  @staticmethod
+  def _worker_quitting(worker):
     """A worker has notified us that it is quitting."""
-    logger.debug("Worker {} self-quitting", worker)
+    logger.debug("Worker %s self-quitting", worker)
     worker.state_change(WorkerState.ENDED)
     worker.last_seen = time.time()
     return b"BYE"

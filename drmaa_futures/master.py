@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class Task(object):
   """Represents a task for workers to do"""
 
-  def __init__(self, function, args, kwargs, id):
+  def __init__(self, task_id, function, *args, **kwargs):
     """Initialise a Task
 
     :param Callable function: The function to run on the remote host
@@ -27,7 +27,7 @@ class Task(object):
     :param dict kwargs:       Keyword arguments to pass to the function
     :param taskid:            An identifier for the new task
     """
-    self._id = id
+    self._id = task_id
     self.future = Future()
     self.worker = None
     # Serialize this function now, to preserve anything the user might
@@ -129,7 +129,7 @@ class ZeroMQListener(object):
     """Ensure we shutdown properly when leaving as a context."""
     self.shutdown()
 
-  def enqueue_task(self, func, args=None, kwargs=None):
+  def enqueue_task(self, func, *args, **kwargs):
     """Add a task to the queue of items.
 
     :param Callable func: The function to call in the task
@@ -140,7 +140,7 @@ class ZeroMQListener(object):
     taskid = self._task_count
     self._task_count += 1
     # Create the task item
-    task = Task(func, args or [], kwargs or {}, id=taskid)
+    task = Task(taskid, func, *args, **kwargs)
     task.id = taskid
     self._tasks[taskid] = task
     # Once added to the queue, only the update thread may touch it

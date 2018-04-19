@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import dill as pickle # Allow e.g. pickling of lambdas
 # import pickle as pickle
 
-from drmaa_futures.slave import run_slave, TaskSystemExit
+from drmaa_futures.slave import run_slave, TaskSystemExit, ExceptionPicklingError
 
 import zmq
 
@@ -141,29 +141,50 @@ def test_basic_slave_task():
     socket.send(b"THX")
 
 def test_failed_slave_task():
-  def _raise_exception():
-    raise RuntimeError("Testing failure")
-  def _sys_exit():
-    sys.exit(1)
   with server() as socket, slave() as proc:
     socket.recv()
     socket.send(b"HAY")
-    assert socket.recv().startswith(b"IZ BORED")
-    # Give the failing function...
-    socket.send(b"PLZ DO " + pickle.dumps((0, _raise_exception)))
-    res = socket.recv()
-    assert res.startswith(b"ONO ")
-    res_id, trace, exc = pickle.loads(res[4:])
-    assert isinstance(exc, RuntimeError)
-    assert "Testing failure" in str(exc)
-    socket.send(b"THX")
 
-    # Try passing something that sys.exit's
-    assert socket.recv().startswith(b"IZ BORED")
-    socket.send(b"PLZ DO " + pickle.dumps((1, _sys_exit)))
-    res_id, trace, exc = pickle.loads(socket.recv()[4:])
-    assert isinstance(exc, TaskSystemExit)
-    socket.send(b"THX")
+    def send_task(func):
+      """Reusable function to send task and raise the exception it returns"""
+      assert socket.recv().startswith(b"IZ BORED")
+      socket.send(b"PLZ DO " + pickle.dumps((0, func)))
+      res = socket.recv()
+      assert res.startswith(b"ONO ")
+      res_id, trace, exc = pickle.loads(res[4:])
+      socket.send(b"THX")
+      raise exc
+
+    # Test something that raises an exception
+    def _raise_exception():
+      raise RuntimeError("Testing failure")
+    with pytest.raises(RuntimeError, message="Testing failure"):
+      send_task(_raise_exception)
+
+    # Test something that calls sys.exit()
+    with pytest.raises(TaskSystemExit):
+      send_task(lambda: sys.exit())
+
+
+    # Try simulating an exception that can't be pickled
+    def _raise_pickleerror():
+      class UnpickleableException(Exception):
+        def __getstate__(self):
+          assert False
+      raise UnpickleableException()
+    with pytest.raises(ExceptionPicklingError):
+      send_task(_raise_pickleerror)
+
+    # Simulate the worker process getting a KeyboardInterrupt
+    def _raise_interrupt():
+      raise KeyboardInterrupt()
+    with pytest.raises(KeyboardInterrupt):
+      send_task(_raise_interrupt)
+    # Check that the worker immediately quits
+    assert socket.recv().startswith(b"IGIVEUP")
+    socket.send(b"BYE")
+    # Give it time to be handled
+    time.sleep(0.3)
 
 def test_slave_self_assign_name():
   with server() as socket:

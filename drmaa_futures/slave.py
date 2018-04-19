@@ -14,7 +14,7 @@ import zmq
 logger = logging.getLogger(__name__)
 
 
-class UnpickleableError(Exception):
+class ExceptionPicklingError(Exception):
   """Represent an error attempting to pickle the result of a task"""
 
 
@@ -53,7 +53,7 @@ def do_task(task_id, task_function):
     try:
       pickle.dumps(exc_value)
     except pickle.PicklingError:
-      exc_value = UnpickleableError("{}: {}".format(
+      exc_value = ExceptionPicklingError("{}: {}".format(
           str(type(exc_value)), str(exc_value)))
     return b"ONO " + pickle.dumps((task_id, exc_trace, exc_value))
 
@@ -98,22 +98,24 @@ def run_slave(server_url, worker_id, timeout=30):
         break
       elif reply.startswith(b"PLZ DO"):
         try:
-          (task_id, task_function) = pickle.loads(data)
+          (task_id, task_function) = pickle.loads(reply[7:])
+          logger.debug("Got task %s (%d bytes)", task_id, len(reply)-7)
           result = do_task(task_id, task_function)
         except KeyboardInterrupt as e:
           # This is a special case; try to tell the master that we failed
           # to quit, then continue to raise the error.
           logger.info("Got interrupt while processing task")
-          socket.send("ONO " + pickle.dumps((task_id, "", e)))
+          socket.send(b"ONO " + pickle.dumps((task_id, "", e)))
           socket.recv()
           # Now, we know we want to quit - so send the message letting
           # the master know. This is a little unclean, but it's only
           # because we are here that we can guarantee that we weren't in
           # the middle of a send/recv when the signal was sent
+          logger.debug("Sending quit message after keyboardinterrupt")
           socket.send(b"IGIVEUP " + worker_id.encode("utf-8"))
           socket.recv()
           raise
-        logger.debug("Sending result")
+        logger.debug("Sending result of %d bytes", len(result))
         socket.send(result)
         # Await the ok
         assert socket.recv() == b"THX"

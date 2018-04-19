@@ -58,26 +58,43 @@ def do_task(task_id, task_function):
     return b"ONO " + pickle.dumps((task_id, exc_trace, exc_value))
 
 
+def _do_handshake(socket, worker_id):
+  logger.debug("Sending hello")
+  socket.send(b"HELO IAM " + worker_id.encode("utf-8"))
+  logger.debug("Awaiting confirmation of hello recieved")
+  assert socket.recv() == b"HAY"
+  logger.debug("Got hello. Going into task loop")
+
+
+def _handle_task(socket, data):
+  """Handle a reply asking us to do a task"""
+  try:
+    (task_id, task_function) = pickle.loads(data)
+    logger.debug("Got task %s (%d bytes)", task_id, len(data))
+    return do_task(task_id, task_function)
+  except KeyboardInterrupt as exc:
+    # This is a special case; try to tell the master that we failed
+    # to quit, then continue to raise the error.
+    logger.info("Got interrupt while processing task")
+    socket.send(b"ONO " + pickle.dumps((task_id, "", exc)))
+    socket.recv()
+    raise
+
+
 def run_slave(server_url, worker_id, timeout=30):
   """Run a slave instance and connect it to a specific master URL.
   :param str server_url: The server string to use to connect
   :param str worker_if:  The worker ID to use when communicating
   :param timeout: The time (in seconds) to wait with no jobs before terminating
   """
+  logger.debug("Running slave {} connect to {}".format(worker_id, server_url))
+  context = zmq.Context()
+  socket = context.socket(zmq.REQ)
+  logger.debug("Connecting")
+  socket.connect(server_url)
+  socket.RCVTIMEO = int(1000 * timeout)
   try:
-    logger.debug("Running slave {} connect to {}".format(
-        worker_id, server_url))
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.RCVTIMEO = int(1000 * timeout)
-    logger.debug("Connecting")
-    socket.connect(server_url)
-    logger.debug("Sending hello")
-    socket.send(b"HELO IAM " + worker_id.encode("utf-8"))
-    logger.debug("Awaiting confirmation of hello recieved")
-    assert socket.recv() == b"HAY"
-    logger.debug(
-        "Got hello. Going into task loop with timeout {}s".format(timeout))
+    _do_handshake(socket, worker_id)
   except zmq.error.Again:
     logger.debug("Timed out waiting for handshake.")
     sys.exit(1)
@@ -98,15 +115,8 @@ def run_slave(server_url, worker_id, timeout=30):
         break
       elif reply.startswith(b"PLZ DO"):
         try:
-          (task_id, task_function) = pickle.loads(reply[7:])
-          logger.debug("Got task %s (%d bytes)", task_id, len(reply)-7)
-          result = do_task(task_id, task_function)
-        except KeyboardInterrupt as e:
-          # This is a special case; try to tell the master that we failed
-          # to quit, then continue to raise the error.
-          logger.info("Got interrupt while processing task")
-          socket.send(b"ONO " + pickle.dumps((task_id, "", e)))
-          socket.recv()
+          result = _handle_task(socket, reply[7:])
+        except KeyboardInterrupt:
           # Now, we know we want to quit - so send the message letting
           # the master know. This is a little unclean, but it's only
           # because we are here that we can guarantee that we weren't in

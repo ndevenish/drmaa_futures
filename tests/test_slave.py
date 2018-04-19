@@ -23,6 +23,7 @@ def server(url=None):
   url = url or "tcp://127.0.0.1:5555"
   c = zmq.Context()
   socket = c.socket(zmq.REP)
+  socket.RCVTIMEO = 500
   socket.bind("tcp://127.0.0.1:5555")
   try:
     yield socket
@@ -31,18 +32,18 @@ def server(url=None):
     c.term()
 
 @contextmanager
-def slave(url=None, id=None, timeout=None):
+def slave(url=None, id="0", timeout=None):
   # We need to update the environment to include this file, so that we can unpickle it's functions
   new_env = dict(os.environ)
   new_env["PYTHONPATH"] = ":".join(new_env.get("PYTHONPATH", "").split(":") + [os.path.dirname(__file__)])
 
-  url = url or "tcp://127.0.0.1:5555"
-  id = id if id is not None else "0"
+  url = [url or "tcp://127.0.0.1:5555"]
+  id = [id] if id is not None else []
   """Run a slave as a context manager"""
   # proc = Process(target=run_slave, args=("tcp://127.0.0.1:5555", "0"))
   # proc.start()
   timeoutl = [] if timeout is None else ["--timeout={}".format(timeout)]
-  proc = subprocess.Popen([sys.executable, "-m", "drmaa_futures", "-v", "slave"] + timeoutl + [url, id], env=new_env)
+  proc = subprocess.Popen([sys.executable, "-m", "drmaa_futures", "-v", "slave"] + timeoutl + url + id, env=new_env)
   try:
     yield proc
   finally:
@@ -126,3 +127,26 @@ def test_basic_slave_task():
     assert res_id == 4
     assert result is None
     socket.send(b"THX")
+
+def test_slave_self_assign_name():
+  with server() as socket:
+    with slave(id=None) as proc:
+      hello = socket.recv()
+      socket.send(b"HAY")
+      wid = hello[9:].decode("UTF-8")
+      assert len(wid) == 32
+
+    os.environ["JOB_ID"] = "1337"
+    os.environ["SGE_TASK_ID"] = "undefined"
+    with slave(id=None) as proc:
+      hello = socket.recv()
+      socket.send(b"HAY")
+      wid = hello[9:].decode("UTF-8")
+      assert wid == "1337"
+
+    os.environ["SGE_TASK_ID"] = "5"
+    with slave(id=None) as proc:
+      hello = socket.recv()
+      socket.send(b"HAY")
+      wid = hello[9:].decode("UTF-8")
+      assert wid == "1337.5"

@@ -60,6 +60,7 @@ def _run_main():
 
   # Generate a slave name automatically if not provided
   if args.id is None:
+    logger.debug("No slave id: Generating")
     args.id = generate_slave_name()
 
   # Copy over the library_path

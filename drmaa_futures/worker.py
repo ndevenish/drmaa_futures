@@ -1,16 +1,17 @@
 # coding: utf-8
-
 """
 Classes and code to manage and interact with worker processes
 """
 
+from enum import Enum
+import logging
 import os
 import sys
-from enum import Enum
+
 import drmaa
 
-import logging
 logger = logging.getLogger(__name__)
+
 
 class WorkerState(Enum):
   """States to track the worker lifecycle"""
@@ -19,6 +20,7 @@ class WorkerState(Enum):
   WAITING = 3
   RUNNING = 4
   ENDED = 5
+
 
 # Table of possible worker state transitions. Used to detect possible
 # errors where we've missed/misprogrammed a change
@@ -32,8 +34,10 @@ WorkerState.mapping = {
     WorkerState.ENDED: set(),
 }
 
+
 class Worker(object):
   """Represents a remote worker instance"""
+
   def __init__(self, workerid):
     """Initialise a Worker instance.
 

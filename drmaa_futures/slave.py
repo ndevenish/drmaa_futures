@@ -13,6 +13,7 @@ import zmq
 
 logger = logging.getLogger(__name__)
 
+
 class UnpickleableError(Exception):
   """Represent an error attempting to pickle the result of a task"""
 

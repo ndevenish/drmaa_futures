@@ -63,7 +63,10 @@ class ZeroMQListener(threading.Thread):
     return self._workers[worker_id]
 
   def clean_stop(self):
-    """Notify for termination, the zeroMQ loop, in preparation for joining the thread"""
+    """Notify that we want to terminate.
+
+    The main zeromq/drmaa loop will shortly end, after this.
+    """
     self._run = False
 
   def run(self):
@@ -145,6 +148,7 @@ class ZeroMQListener(threading.Thread):
     job.worker_id = worker_id
 
   def _worker_ended(self, worker_id):
+    worker = self._workers[worker_id]
     worker.state_change(WorkerState.ENDED)
     worker.last_seen = time.time()
 

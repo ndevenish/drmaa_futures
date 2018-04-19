@@ -22,13 +22,12 @@ class TaskSystemExit(Exception):
   """For when the task raised a SystemExit exception, trying to quit"""
 
 
-def do_task(data):
+def do_task(task_id, task_function):
   """Do a task, as specified in a pickle bundle.
 
   :arg byte data: The pickle-data to load
   :returns: Pickle data of the result, or an exception
   """
-  (task_id, task_function) = pickle.loads(data)
   try:
     logger.debug("Running task with ID {}".format(task_id))
     # Run whatever task we've been given
@@ -37,7 +36,8 @@ def do_task(data):
     # An error pickling here counts as a job failure
     return b"YAY " + pickle.dumps((task_id, result))
   except KeyboardInterrupt:
-    # This is interactive so we want to let it float
+    # This is interactive so we want to let it float up - we'll handle the
+    # special case in the parent context
     raise
   except BaseException:
     logger.debug("Exception processing task")
@@ -46,6 +46,7 @@ def do_task(data):
     exc_trace = traceback.format_tb(exc_trace)
     # We don't want to propagate a SystemExit to the other side
     if isinstance(exc_value, SystemExit):
+      logger.debug("Intercepted task calling sys.exit")
       exc_value = TaskSystemExit()
     # Be careful - we might not be able to pickle the exception?? Go to lengths
     # to make sure that we pass something sensible back
@@ -96,16 +97,31 @@ def run_slave(server_url, worker_id, timeout=30):
         logger.debug("Got quit signal. ending main loop.")
         break
       elif reply.startswith(b"PLZ DO"):
-        result = do_task(reply[len(b"PLZ DO "):])
+        try:
+          (task_id, task_function) = pickle.loads(data)
+          result = do_task(task_id, task_function)
+        except KeyboardInterrupt as e:
+          # This is a special case; try to tell the master that we failed
+          # to quit, then continue to raise the error.
+          logger.info("Got interrupt while processing task")
+          socket.send("ONO " + pickle.dumps((task_id, "", e)))
+          socket.recv()
+          # Now, we know we want to quit - so send the message letting
+          # the master know. This is a little unclean, but it's only
+          # because we are here that we can guarantee that we weren't in
+          # the middle of a send/recv when the signal was sent
+          socket.send(b"IGIVEUP " + worker_id.encode("utf-8"))
+          socket.recv()
+          raise
         logger.debug("Sending result")
         socket.send(result)
         # Await the ok
         assert socket.recv() == b"THX"
         last_job = time.time()
     if time.time() - last_job >= timeout:
+      logger.debug("Waited too long for new tasks. Quitting.")
       socket.send(b"IGIVEUP " + worker_id.encode("utf-8"))
       socket.recv()
-      logger.debug("Timed out while waiting for tasks")
   finally:
     logger.debug("Closing socket")
     socket.close()

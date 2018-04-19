@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import dill as pickle # Allow e.g. pickling of lambdas
 # import pickle as pickle
 
-from drmaa_futures.slave import run_slave
+from drmaa_futures.slave import run_slave, TaskSystemExit
 
 import zmq
 
@@ -59,6 +59,10 @@ def slave(url=None, id="0", timeout=None):
 def test_launch_slave_subprocess():
   slave = subprocess.Popen([sys.executable, "-m", "drmaa_futures", "--help"])
   assert slave.wait() == 0
+  # And, without a command
+  slave = subprocess.Popen([sys.executable, "-m", "drmaa_futures"])
+  assert slave.wait() != 0
+
 
 def test_slave_hello():
   with server() as socket, slave():
@@ -129,9 +133,36 @@ def test_basic_slave_task():
     # And again
     assert socket.recv().startswith(b"IZ BORED")
     socket.send(b"PLZ DO " + pickle.dumps((4, lambda: time.sleep(1.2))))
-    res_id, result = pickle.loads(socket.recv()[4:])
+    res = socket.recv()
+    assert res.startswith(b"YAY")
+    res_id, result = pickle.loads(res[4:])
     assert res_id == 4
     assert result is None
+    socket.send(b"THX")
+
+def test_failed_slave_task():
+  def _raise_exception():
+    raise RuntimeError("Testing failure")
+  def _sys_exit():
+    sys.exit(1)
+  with server() as socket, slave() as proc:
+    socket.recv()
+    socket.send(b"HAY")
+    assert socket.recv().startswith(b"IZ BORED")
+    # Give the failing function...
+    socket.send(b"PLZ DO " + pickle.dumps((0, _raise_exception)))
+    res = socket.recv()
+    assert res.startswith(b"ONO ")
+    res_id, trace, exc = pickle.loads(res[4:])
+    assert isinstance(exc, RuntimeError)
+    assert "Testing failure" in str(exc)
+    socket.send(b"THX")
+
+    # Try passing something that sys.exit's
+    assert socket.recv().startswith(b"IZ BORED")
+    socket.send(b"PLZ DO " + pickle.dumps((1, _sys_exit)))
+    res_id, trace, exc = pickle.loads(socket.recv()[4:])
+    assert isinstance(exc, TaskSystemExit)
     socket.send(b"THX")
 
 def test_slave_self_assign_name():

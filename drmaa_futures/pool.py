@@ -1,3 +1,7 @@
+# coding: utf-8
+"""
+Pool to manage drmaa workers
+"""
 import os
 import sys
 
@@ -8,6 +12,7 @@ class Pool(object):
   """Manage a pool of DRMAA workers"""
 
   def __init__(self, endpoint):
+    """Initialize a pool controller"""
     self._session = drmaa.Session()
     self._session.initialize()
     # Create a persistent template for launching workers
@@ -20,7 +25,8 @@ class Pool(object):
     self._template.args = ["-mdrmaa_futures", "-v", "slave", endpoint]
 
   def shutdown(self):
+    """Shutdown all pool workers and clean up resources"""
     self._session.deleteJobTemplate(self._template)
 
   def launch_worker(self):
-    pass
+    """Explicitly launch a new pool worker"""

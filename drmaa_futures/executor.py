@@ -12,3 +12,6 @@ class DRMAAPoolExecutor(Executor):
     :param int max_jobs: The maximum number of jobs to launch.
     """
     self._max_jobs = max_jobs
+
+  def submit(self, fn, *args, **kwargs):
+    """Submit a function to the cluster"""

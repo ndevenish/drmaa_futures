@@ -77,8 +77,11 @@ def test_slave_timeout():
     # Now wait for job requests
     while time.time()-start < test_timeout+2:
       try:
-        assert socket.recv().startswith(b"IZ BORED")
-        socket.send(b"PLZ WAIT")
+        msg = socket.recv()
+        if msg.startswith(b"IZ BORED"):
+          socket.send(b"PLZ WAIT")
+        elif msg.startswith(b"IGIVEUP"):
+          socket.send(b"BYE")
         sent += 1
       except zmq.error.Again:
         pass

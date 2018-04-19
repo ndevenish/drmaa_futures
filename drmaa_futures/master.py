@@ -132,12 +132,14 @@ class ZeroMQListener(object):
     :rtype byte:
     """
     # The first time we encounter a worker it's not known
-    def decode(x):
-      return x.decode("utf-8")
+    def decode(data):
+      """Decode the message data as a string"""
+      return data.decode("utf-8")
 
     # Once past handshaking, we already have a worker
-    def decode_worker(x):
-      return self._workers[x.decode("utf-8")]
+    def decode_worker(data):
+      """Decode the message data as a worker ID"""
+      return self._workers[data.decode("utf-8")]
 
     # Table of possible message beginnings, the functions to decode any
     # attached data, and the functions to then handle the request

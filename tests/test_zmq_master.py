@@ -44,7 +44,6 @@ def client(loop):
   s.close()
 
 def test_hello(loop, client):
-  logger.debug("t")
   client.send(b"HELO IAM 0")
   assert client.recv() == b"HAY"
   assert loop._workers

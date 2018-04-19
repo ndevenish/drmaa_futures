@@ -18,21 +18,28 @@ logger = logging.getLogger()
 
 
 def generate_slave_name():
+  """Generate a slave name, if we weren't provided with one.
+
+  Here is where specific logic goes to work out if we are in some known
+  cluster environment, and thus base workers on machine names. If all
+  else fails, then a UUID is generated.
+  :returns: A name to use for worker ID
+  :rtype: str
+  """
   if "JOB_ID" in os.environ and "SGE_TASK_ID" in os.environ:
     # We appear to be running inside an SGE-style system
     task_id = os.environ["SGE_TASK_ID"]
     if task_id == "undefined":
       # SGE single job, no array.
       return os.environ["JOB_ID"]
-    else:
-      # We're evidently in an array job!
-      return "{}.{}".format(os.environ["JOB_ID"], task_id)
-  else:
-    # Not sure what this is - use UUID4
-    return uuid.uuid4().hex
+    # We're evidently in an array job!
+    return "{}.{}".format(os.environ["JOB_ID"], task_id)
+  # Not sure what this is - use UUID4
+  return uuid.uuid4().hex
 
 
 def _run_main():
+  """Run the main method"""
   # intention: drmaa_futures [-v|(-h | --help)] slave [(-h|--help)] <url> <id>
   parser = ArgumentParser(prog="python -mdrmaa_futures")
   parser.add_argument(

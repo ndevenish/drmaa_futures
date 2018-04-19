@@ -71,6 +71,14 @@ def test_slave_hello():
     socket.send(b"HAY")
     time.sleep(0.2)
 
+def test_slave_hello_timeout():
+  """Test that the slave times out whilst waiting for a handshake"""
+  with server() as socket, slave(timeout=0.3) as proc:
+    socket.RCVTIMEO=500
+    assert socket.recv().decode("utf-8") == "HELO IAM 0"
+    time.sleep(0.4)
+    assert proc.poll is not None
+
 def test_slave_timeout():
   """Test that the slave times out whilst waiting with nothing to do"""
   test_timeout = 3

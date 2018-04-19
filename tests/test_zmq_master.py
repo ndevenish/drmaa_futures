@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 """Tests of the zeromq master loop."""
 
 import threading
@@ -17,10 +16,12 @@ import logging
 # logging.basicConfig()#level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
 @pytest.fixture
 def loop():
   zmq = ZeroMQListener(endpoint="inproc://test")
   run = True
+
   def _do_thread():
     try:
       while run:
@@ -28,6 +29,7 @@ def loop():
     except Exception as e:
       logger.error("Got exception in worker thread: %s", e)
       logger.error(traceback.format_exc())
+
   thread = threading.Thread(target=_do_thread)
   # Allow loose test threads?
   # thread.daemon = True
@@ -36,6 +38,7 @@ def loop():
   run = False
   thread.join()
 
+
 @pytest.fixture
 def client(loop):
   s = loop._context.socket(zmq.REQ)
@@ -43,6 +46,7 @@ def client(loop):
   s.connect("inproc://test")
   yield s
   s.close()
+
 
 def test_hello_and_goodbye(loop, client):
   client.send(b"HELO IAM 0")
@@ -56,11 +60,13 @@ def test_hello_and_goodbye(loop, client):
   assert client.recv() == b"BYE"
   assert loop.active_workers == 1
 
+
 def test_no_tasks(loop, client):
   client.send(b"HELO IAM 0")
   client.recv()
   client.send(b"IZ BORED 0")
   assert client.recv() == b"PLZ WAIT"
+
 
 def test_simple_task(loop, client):
   # Two workers
@@ -90,6 +96,7 @@ def test_simple_task(loop, client):
   assert task.done()
   assert task.result() == 42
 
+
 def test_task_cancel(loop, client):
   client.send(b"HELO IAM 0")
   client.recv()
@@ -102,10 +109,19 @@ def test_task_cancel(loop, client):
   client.send(b"IZ BORED 0")
   assert client.recv() == b"PLZ WAIT"
 
+def test_zmq_as_context_manager():
+  with ZeroMQListener(endpoint="inproc://test") as loop:
+    assert loop
+
+def test_default_binding_behaviour():
+  with ZeroMQListener() as loop:
+    assert loop.endpoint.startswith("tcp")
+    assert loop.endpoint.split(":")[-1] != "0"
+
 def test_bad_worker_message():
   # Set up a new worker, in this thread
-  loop = ZeroMQListener(endpoint="inproc://test")
-  with contextmanager(client)(loop) as socket:
+  with  ZeroMQListener(endpoint="inproc://test") as loop, \
+        contextmanager(client)(loop) as socket:
     # Send a "bad" message
     socket.send(b"WTF")
     with pytest.raises(RuntimeError) as exc:

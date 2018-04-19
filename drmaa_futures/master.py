@@ -135,6 +135,10 @@ class ZeroMQListener(object):
     """Ensure we shutdown properly when leaving as a context."""
     self.shutdown()
 
+  def __enter__(self):
+    """Enter a context"""
+    return self
+
   def enqueue_task(self, func, *args, **kwargs):
     """Add a task to the queue of items.
 
@@ -154,10 +158,8 @@ class ZeroMQListener(object):
 
   def _add_worker(self, worker_id):
     """Register a worker to the manager."""
-    if worker_id in self._workers:
-      logger.warning("Trying to add worker {} twice?".format(worker_id))
-    else:
-      self._workers[worker_id] = Worker(worker_id)
+    assert worker_id not in self._workers
+    self._workers[worker_id] = Worker(worker_id)
     return self._workers[worker_id]
 
   def process_messages(self):
@@ -221,11 +223,8 @@ class ZeroMQListener(object):
   def _worker_handshake(self, worker_id):
     """A Worker has said hello. Change it's state and make sure it's known."""
     logger.info("Got handshake from worker %s", worker_id)
-    if worker_id in self._workers:
-      logger.warning("Handshake from already registered worker %s???",
-                     worker_id)
-    else:
-      self._add_worker(worker_id)
+    assert worker_id not in self._workers
+    self._add_worker(worker_id)
     worker = self._workers[worker_id]
     # Register that we now have seen this worker
     worker.state_change(WorkerState.STARTED)

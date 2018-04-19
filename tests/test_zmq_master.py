@@ -27,7 +27,7 @@ def loop():
         zmq.process_messages()
     except Exception as e:
       logger.error("Got exception in worker thread: %s", e)
-      traceback.print_exc()
+      logger.error(traceback.format_exc())
   thread = threading.Thread(target=_do_thread)
   # Allow loose test threads?
   # thread.daemon = True
@@ -102,4 +102,13 @@ def test_task_cancel(loop, client):
   client.send(b"IZ BORED 0")
   assert client.recv() == b"PLZ WAIT"
 
-
+def test_bad_worker_message():
+  # Set up a new worker, in this thread
+  loop = ZeroMQListener(endpoint="inproc://test")
+  with contextmanager(client)(loop) as socket:
+    # Send a "bad" message
+    socket.send(b"WTF")
+    with pytest.raises(RuntimeError) as exc:
+      loop.process_messages()
+    assert "Could not match message" in str(exc.value)
+  loop.shutdown()

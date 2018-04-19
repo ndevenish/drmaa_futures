@@ -197,7 +197,8 @@ class ZeroMQListener(object):
       return self._workers[data.decode("utf-8")]
 
     def decode_pickle(data):
-      logger.debug("Recieved %d byte result" % len(data))
+      """Decode data as a pickle blob"""
+      logger.debug("Recieved %d byte result", len(data))
       return pickle.loads(data)
 
     # Table of possible message beginnings, the functions to decode any

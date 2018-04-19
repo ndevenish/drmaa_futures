@@ -86,26 +86,22 @@ def run_slave(server_url, worker_id, timeout=30):
     while time.time() - last_job < timeout:
       logger.debug("Asking for a task")
       socket.send("IZ BORED {}".format(worker_id).encode("UTF-8"))
-      try:
-        reply = socket.recv()
-        # We get a command returned
-        assert reply.startswith(b"PLZ")
-        if reply == b"PLZ WAIT":
-          logger.debug("No tasks available. Trying again in a few seconds.")
-          time.sleep(min(timeout / 2.0, 5))
-        elif reply == b"PLZ GOWAY":
-          logger.debug("Got quit signal. ending main loop.")
-          break
-        elif reply.startswith(b"PLZ DO"):
-          result = do_task(reply[len(b"PLZ DO "):])
-          logger.debug("Sending result")
-          socket.send(result)
-          # Await the ok
-          assert socket.recv() == b"THX"
-          last_job = time.time()
-      except zmq.error.Again:
-        # If we hit the send/recieve timeout, just wait and try again
-        pass
+      reply = socket.recv()
+      # We get a command returned
+      assert reply.startswith(b"PLZ")
+      if reply == b"PLZ WAIT":
+        logger.debug("No tasks available. Trying again in a few seconds.")
+        time.sleep(min(timeout / 2.0, 5))
+      elif reply == b"PLZ GOWAY":
+        logger.debug("Got quit signal. ending main loop.")
+        break
+      elif reply.startswith(b"PLZ DO"):
+        result = do_task(reply[len(b"PLZ DO "):])
+        logger.debug("Sending result")
+        socket.send(result)
+        # Await the ok
+        assert socket.recv() == b"THX"
+        last_job = time.time()
     if time.time() - last_job >= timeout:
       socket.send(b"IGIVEUP " + worker_id.encode("utf-8"))
       socket.recv()

@@ -9,32 +9,21 @@ import time
 
 from enum import Enum
 
-
-class WorkerState(Enum):
-  "States to track the worker lifecycle"
-  UNKNOWN = 1
-  STARTED = 2
-  WAITING = 3
-  RUNNING = 4
-  ENDED = 5
-
-
-WorkerState.mapping = {
-    WorkerState.UNKNOWN: {WorkerState.STARTED},
-    WorkerState.STARTED: {WorkerState.WAITING},
-    WorkerState.WAITING:
-    {WorkerState.RUNNING, WorkerState.ENDED, WorkerState.WAITING},
-    WorkerState.RUNNING: {WorkerState.TASKCOMPLETE},
-    WorkerState.TASKCOMPLETE: {WorkerState.WAITING},
-    WorkerState.ENDED: set(),
-}
-
 import logging
 logger = logging.getLogger(__name__)
 
+from .worker import Worker, WorkerState
 
 class WorkItem(object):
+  """Represents a task for workers to do"""
   def __init__(self, function, args, kwargs, jobid):
+    """Initialise a WorkItem.
+
+    :param Callable function: The function to run on the remote host
+    :param Iterable args:     Positional arguments to pass to the function
+    :param dict kwargs:       Keyword arguments to pass to the function
+    :param jobid:             A job identifier for the new item
+    """
     self.id = jobid
     self.future = Future()
     # Serialize this function now, to preserve anything the user might
@@ -43,22 +32,8 @@ class WorkItem(object):
     self.worker_id = None
 
 
-class Worker(object):
-  def __init__(self, workerid):
-    self.id = workerid
-    self.tasks = set()
-    self.last_seen = None
-    self.state = WorkerState.UNKNOWN
-
-  def state_change(self, new):
-    """Change the worker state. Validate against known transitions."""
-    if not new in WorkerState.mapping[self.state]:
-      logger.warn("Invalid state transition for worker {}: {} → {}".format(
-          self.id, self.state, new))
-    self.state = new
-
-
 class ZeroMQListener(threading.Thread):
+  """Handle the zeromq/worker loop"""
   def __init__(self):
     self._work_queue = Queue()
     self._work_info = {}
@@ -73,6 +48,7 @@ class ZeroMQListener(threading.Thread):
     self._job_count += 1
     item = WorkItem(func, args, kwargs, jobid)
     self._work_info[jobid] = item
+    # Once added to the queue, only this class may touch it
     self._work_queue.add(jobid)
     return item.future
 
@@ -91,11 +67,11 @@ class ZeroMQListener(threading.Thread):
   def run(self):
     self._run = True
     self._context = zmq.Context()
-    self._session = self._context.session(zmg.REP)
-    self._session.RCVTIMEO = 200
+    self._socket = self._context.socket(zmg.REP)
+    self._socket.RCVTIMEO = 200
     while self._run:
       try:
-        req = self._session.recv()
+        req = self._socket.recv()
         if req.startswith(b"HELO IAM"):
           worker = req[len(b"HELO IAM "):].decode("utf-8")
           logger.info("Got handshake from worker " + worker)
@@ -106,11 +82,11 @@ class ZeroMQListener(threading.Thread):
           # Get a job for this to do
           job = self._get_next_job()
           if job is None:
-            self._session.send(b"PLZ WAIT")
+            self._socket.send(b"PLZ WAIT")
             self._worker_waiting(worker)
             logger.debug("... no jobs for {}, asking to wait".format(worker))
           else:
-            self._session.send(b"PLZ DO" + job.data)
+            self._socket.send(b"PLZ DO" + job.data)
             self._worker_given_job(worker, job.id)
             logger.debug("Worker {} given task {}".format(worker, job.id))
         elif req.startswith(b"YAY"):
@@ -119,7 +95,7 @@ class ZeroMQListener(threading.Thread):
           self._fail_task(res[4:])
         elif req.startswith(b"IGIVEUP"):
           worker = req[len(b"IGIVEUP "):].decode("utf-8")
-          self._session.send(b"BYE")
+          self._socket.send(b"BYE")
           logger.debug("Worker {} ended".format(worker))
           self._worker_ended(worker)
         else:
@@ -128,6 +104,10 @@ class ZeroMQListener(threading.Thread):
       except zmq.error.Again:
         # We hit a timeout. Just keep going
         pass
+    # We're shutting down. Close the socket and context.
+    logger.debug("Ending ZeroMQ socket and context")
+    self._socket.close()
+    self._context.term()
 
   def _worker_handshake(self, worker_id):
     """A Worker has said hello. Change it's state and make sure it's known."""
@@ -220,6 +200,11 @@ class Pool(object):
     self._session.initialize()
     # Start a zeromq listener in a thread
 
-  def start(self):
-    thread = threading.Thread(target=worker_routine, args=(url_worker, ))
-    thread.start()
+  def 
+
+  def launch_worker(self):
+    pass
+
+  # def start(self):
+    # thread = threading.Thread(target=worker_routine, args=(url_worker, ))
+    # thread.start()

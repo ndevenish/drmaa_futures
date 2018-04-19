@@ -5,23 +5,53 @@ import sys
 
 import drmaa
 
+import logging
+logger = logging.getLogger(__name__)
 
-class Pool(object):
-  session = "DRMAA Session"
+class WorkerState(Enum):
+  """States to track the worker lifecycle"""
+  UNKNOWN = 1
+  STARTED = 2
+  WAITING = 3
+  RUNNING = 4
+  ENDED = 5
 
-  def get_new_worker_id():
-    return 0
-
-  def start_new_worker():
-    pass
-
+# Table of possible worker state transitions. Used to detect possible
+# errors where we've missed/misprogrammed a change
+WorkerState.mapping = {
+    WorkerState.UNKNOWN: {WorkerState.STARTED},
+    WorkerState.STARTED: {WorkerState.WAITING},
+    WorkerState.WAITING:
+    {WorkerState.RUNNING, WorkerState.ENDED, WorkerState.WAITING},
+    WorkerState.RUNNING: {WorkerState.TASKCOMPLETE},
+    WorkerState.TASKCOMPLETE: {WorkerState.WAITING},
+    WorkerState.ENDED: set(),
+}
 
 class Worker(object):
-  """Represents a worker job instance"""
+  """Represents a remote worker instance"""
+  def __init__(self, workerid):
+    """Initialise a Worker instance.
 
-  def __init__(self, job_id, session):
-    self._session = session
-    self._jobid = job_id
+    :param str workerid: An identifier for the worker this represents
+    """
+    self.id = workerid
+    self.tasks = set()
+    self.last_seen = None
+    self.state = WorkerState.UNKNOWN
+
+  def state_change(self, new):
+    """Change the worker state.
+
+    Validates against known transitions. If the state change is invalid, then a
+    warning will be printed to the log, but the state change will proceed.
+
+    :param WorkerState new: The new state to transition to.
+    """
+    if not new in WorkerState.mapping[self.state]:
+      logger.warn("Invalid state transition for worker {}: {} → {}".format(
+          self.id, self.state, new))
+    self.state = new
 
   @classmethod
   def launch(cls, pool, timeout=None):
@@ -38,7 +68,6 @@ class Worker(object):
     timeoutl = [] if timeout is None else ["--timeout={}".format(timeout)]
     # Work out a unique worker_if
     worker_id = pool.get_new_worker_id()
-    _worker_id += 1
 
     jt.args = ["-mdrmaa_futures", "-v", "slave"
                ] + timeoutl + [host_url, _worker_id]

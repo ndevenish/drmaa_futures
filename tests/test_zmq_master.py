@@ -48,3 +48,6 @@ def test_hello(loop, client):
   client.send(b"HELO IAM 0")
   assert client.recv() == b"HAY"
   assert loop._workers
+  client.send(b"HELO IAM C3PO")
+  assert client.recv() == b"HAY"
+  assert "C3PO" in loop._workers

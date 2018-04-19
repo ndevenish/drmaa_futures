@@ -31,6 +31,7 @@ def generate_slave_name():
     # Not sure what this is - use UUID4
     return uuid.uuid4().hex
 
+
 def _run_main():
   # intention: drmaa_futures [-v|(-h | --help)] slave [(-h|--help)] <url> <id>
   parser = ArgumentParser(prog="python -mdrmaa_futures")
@@ -71,7 +72,8 @@ def _run_main():
     new_path = backup_path + [x for x in library_path if x not in backup_path]
     os.environ["LD_LIBRARY_PATH"] = ":".join(new_path)
 
-  logger.info("Starting slave node {} with master {}".format(args.id, args.url))
+  logger.info("Starting slave node {} with master {}".format(
+      args.id, args.url))
   from drmaa_futures.slave import run_slave
   run_slave(args.url, args.id, timeout=args.timeout)
 

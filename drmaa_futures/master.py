@@ -1,5 +1,4 @@
 # coding: utf-8
-
 """
 Contains the master control for ZeroMQ communication.
 """
@@ -133,9 +132,13 @@ class ZeroMQListener(object):
     :rtype byte:
     """
     # The first time we encounter a worker it's not known
-    decode = lambda x: x.decode("utf-8")
+    def decode(x):
+      return x.decode("utf-8")
+
     # Once past handshaking, we already have a worker
-    decode_worker = lambda x: self._workers[x.decode("utf-8")]
+    def decode_worker(x):
+      return self._workers[x.decode("utf-8")]
+
     # Table of possible message beginnings, the functions to decode any
     # attached data, and the functions to then handle the request
     potential_messages = {
@@ -157,7 +160,8 @@ class ZeroMQListener(object):
     """A Worker has said hello. Change it's state and make sure it's known."""
     logger.info("Got handshake from worker %s", worker_id)
     if worker_id in self._workers:
-      logger.warning("Handshake from already registered worker %s???", worker_id)
+      logger.warning("Handshake from already registered worker %s???",
+                     worker_id)
     else:
       self._add_worker(worker_id)
     worker = self._workers[worker_id]

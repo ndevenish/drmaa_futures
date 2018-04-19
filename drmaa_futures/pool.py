@@ -1,9 +1,13 @@
+import os
+import sys
+
 import drmaa
+
 
 class Pool(object):
   """Manage a pool of DRMAA workers"""
 
-  def __init__(self):
+  def __init__(self, endpoint):
     self._session = drmaa.Session()
     self._session.initialize()
     # Create a persistent template for launching workers
@@ -13,7 +17,7 @@ class Pool(object):
     env_copy = dict(os.environ)
     env_copy["_LD_LIBRARY_PATH"] = env_copy.get("LD_LIBRARY_PATH", "")
     self._template.jobEnvironment = env_copy
-    jt.args = ["-mdrmaa_futures", "-v", "slave", host_url]
+    self._template.args = ["-mdrmaa_futures", "-v", "slave", endpoint]
 
   def shutdown(self):
     self._session.deleteJobTemplate(self._template)

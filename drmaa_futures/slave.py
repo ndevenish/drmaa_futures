@@ -126,6 +126,7 @@ def run_slave(server_url, worker_id, timeout=30):
       socket.recv()
   finally:
     logger.debug("Closing socket")
+    socket.LINGER = 300
     socket.close()
     logger.debug("Closing context")
     context.term()

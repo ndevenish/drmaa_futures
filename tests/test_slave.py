@@ -12,12 +12,15 @@ import pytest
 import signal
 import subprocess
 from contextlib import contextmanager
+import logging
 import dill as pickle # Allow e.g. pickling of lambdas
 # import pickle as pickle
 
 from drmaa_futures.slave import run_slave, TaskSystemExit, ExceptionPicklingError
 
 import zmq
+
+logger = logging.getLogger(__name__)
 
 @contextmanager
 def server(url=None):
@@ -73,9 +76,17 @@ def test_slave_hello():
 
 def test_slave_hello_timeout():
   """Test that the slave times out whilst waiting for a handshake"""
+  # First test timing out without even recieving it's message
+  logger.debug("Testing no message at all")
+  with slave(timeout=0.3) as proc:
+    time.sleep(0.4)
+    assert proc.poll is not None
+  # .. and test not getting a response
+  logger.info("Testing the slave not getting a response")
   with server() as socket, slave(timeout=0.3) as proc:
     socket.RCVTIMEO=500
     assert socket.recv().decode("utf-8") == "HELO IAM 0"
+    logger.info("Recieved initial message, waiting to see if it dies")
     time.sleep(0.4)
     assert proc.poll is not None
 

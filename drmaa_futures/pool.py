@@ -1,18 +1,18 @@
 # coding: utf-8
 
-import zmq
-import drmaa
-import threading
 from concurrent.futures import Future
-from six.moves.queue import Queue
+import logging
+import threading
 import time
 
-from enum import Enum
-
-import logging
-logger = logging.getLogger(__name__)
+import drmaa
+from six.moves.queue import Queue
+import zmq
 
 from .worker import Worker, WorkerState
+
+logger = logging.getLogger(__name__)
+
 
 class Task(object):
   """Represents a task for workers to do"""
@@ -200,8 +200,6 @@ class Pool(object):
     self._session = drmaa.Session()
     self._session.initialize()
     # Start a zeromq listener in a thread
-
-  def 
 
   def launch_worker(self):
     pass

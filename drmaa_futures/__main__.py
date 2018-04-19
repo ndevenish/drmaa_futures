@@ -15,7 +15,7 @@ import logging
 # If __main__, we are the root logger
 logger = logging.getLogger()
 
-if __name__ == "__main__":
+def _run_main():
   # intention: drmaa_futures [-v|(-h | --help)] slave [(-h|--help)] <url> <id>
   parser = ArgumentParser(prog="python -mdrmaa_futures")
   parser.add_argument(
@@ -53,3 +53,7 @@ if __name__ == "__main__":
   logger.info("Starting slave node with master {}".format(args.url))
   from drmaa_futures.slave import run_slave
   run_slave(args.url, args.id, timeout=args.timeout)
+
+
+if __name__ == "__main__":
+  _run_main()

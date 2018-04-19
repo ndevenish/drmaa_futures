@@ -3,14 +3,14 @@
 Running a slave instance.
 """
 
+import logging
+import sys
 import time
 import traceback
-import sys
 
 import dill as pickle
 import zmq
 
-import logging
 logger = logging.getLogger(__name__)
 
 class UnpickleableError(Exception):

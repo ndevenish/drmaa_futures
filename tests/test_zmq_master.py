@@ -4,6 +4,7 @@
 """Tests of the zeromq master loop."""
 
 import threading
+import traceback
 from contextlib import contextmanager
 
 from drmaa_futures.master import ZeroMQListener
@@ -20,8 +21,12 @@ def loop():
   zmq = ZeroMQListener(endpoint="inproc://test")
   run = True
   def _do_thread():
-    while run:
-      zmq.process_messages()
+    try:
+      while run:
+        zmq.process_messages()
+    except Exception as e:
+      logger.error("Got exception in worker thread: %s", e)
+      traceback.print_exc()
   thread = threading.Thread(target=_do_thread)
   # Allow loose test threads?
   # thread.daemon = True
@@ -40,6 +45,6 @@ def client(loop):
 
 def test_hello(loop, client):
   logger.debug("t")
-  client.send(b"HELO 0")
+  client.send(b"HELO IAM 0")
   assert client.recv() == b"HAY"
   assert loop._workers

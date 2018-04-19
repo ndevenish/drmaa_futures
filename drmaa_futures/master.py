@@ -147,8 +147,8 @@ class ZeroMQListener(object):
     }
     # Find the message in the table
     for message, (processor, function) in potential_messages.items():
-      logger.debug("Recieved %s message", message)
       if request.startswith(message):
+        logger.debug("Recieved %s message", message)
         data = processor(request[len(message) + 1:])
         return function(data)
     raise RuntimeError("Could not match message {}".format(request[:10]))
@@ -158,11 +158,13 @@ class ZeroMQListener(object):
     logger.info("Got handshake from worker %s", worker_id)
     if worker_id in self._workers:
       logger.warning("Handshake from already registered worker %s???", worker_id)
+    else:
       self._add_worker(worker_id)
     worker = self._workers[worker_id]
     # Register that we now have seen this worker
     worker.state_change(WorkerState.STARTED)
     worker.last_seen = time.time()
+    return b"HAY"
 
   def _worker_waiting(self, worker):
     """A worker is awaiting a new task"""

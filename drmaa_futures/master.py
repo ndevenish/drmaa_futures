@@ -89,6 +89,28 @@ class Worker(object):
           self.id, self.state, new))
     self.state = new
 
+def bind_to_endpoint(zsocket, endpoint=None):
+  """Bind a zeromq socket to an endpoint, specified or random TCP.
+
+  :param str endpoint: The endpoint to bind to. If None, a free-port TCP
+                       endpoint will be automatically generated.
+  :returns:         The endpoint to send to clients. Same is input, if not None
+  :rtype: str
+  """
+  # Do we need to decide on an endpoint ourselves?
+  if endpoint is None:
+    # Bind to a random tcp port, then work out the endpoint to connect to
+    endpoint = "tcp://*:0"
+    logger.debug("Binding socket to %s", endpoint)
+    zsocket.bind("tcp://*:0")
+    # socket.getfqdn()
+    bound_to = urllib.parse.urlparse(zsocket.LAST_ENDPOINT)
+    return "tcp://{}:{}".format(socket.getfqdn(), bound_to.port)
+  # Trust that the user knows how to connect to this custom endpoint
+  logger.debug("Binding socket to %s", endpoint)
+  zsocket.bind(endpoint)
+  return endpoint
+
 
 class ZeroMQListener(object):
   """Handle the zeromq/worker loop"""
@@ -110,20 +132,7 @@ class ZeroMQListener(object):
     self._socket = self._context.socket(zmq.REP)
     self._socket.RCVTIMEO = 200
     logger.debug("Binding zeroMQ socket")
-    # Do we need to decide on an endpoint ourselves?
-    if endpoint is None:
-      # Bind to a random tcp port, then work out the endpoint to connect to
-      endpoint = "tcp://*:0"
-      logger.debug("Binding socket to %s", endpoint)
-      self._socket.bind("tcp://*:0")
-      # socket.getfqdn()
-      bound_to = urllib.parse.urlparse(self._socket.LAST_ENDPOINT)
-      self.endpoint = "tcp://{}:{}".format(socket.getfqdn(), bound_to.port)
-    else:
-      # Trust that the user knows how to connect to this custom endpoint
-      logger.debug("Binding socket to %s", endpoint)
-      self._socket.bind(endpoint)
-      self.endpoint = endpoint
+    self.endpoint = bind_to_endpoint(self._socket, endpoint)
 
   @property
   def active_workers(self):

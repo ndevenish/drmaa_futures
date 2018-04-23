@@ -59,6 +59,10 @@ test: ## run tests quickly with the default Python
 test-all: ## run tests on every Python version with tox
 	tox
 
+test-docker: ## Run every test on every python on a docker image
+	docker build -t drmaa_futures_test .
+	docker run -it -v $(shell pwd):/opt/drmaa_futures drmaa_futures_test:latest su - sgeuser bash -c "cd /opt/drmaa_futures && tox --workdir=/tmp/.tox"
+
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source drmaa_futures -m pytest
 	coverage report -m

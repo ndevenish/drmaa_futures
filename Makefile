@@ -60,16 +60,12 @@ test-all: ## run tests on every Python version with tox
 	tox
 
 test-docker: ## Run every test on every python on a docker image
-	find drmaa_futures tests -name "*.pyc" -delete
 	docker build -t drmaa_futures_test .
 	docker run -it -v $(shell pwd):/opt/drmaa_futures drmaa_futures_test:latest su - sgeuser bash -c "cd /opt/drmaa_futures; tox --workdir=/tmp/tox"
-	find drmaa_futures tests -name "*.pyc" -delete
 
 run-docker: ## Load a docker environment for testing
-	find drmaa_futures tests -name "*.pyc" -delete
 	docker build -t drmaa_futures_test .
 	docker run -it -v $(shell pwd):/opt/drmaa_futures drmaa_futures_test:latest login -f sgeuser
-	find drmaa_futures tests -name "*.pyc" -delete
 
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source drmaa_futures -m pytest

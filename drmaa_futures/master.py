@@ -89,6 +89,7 @@ class Worker(object):
           self.id, self.state, new))
     self.state = new
 
+
 def bind_to_endpoint(zsocket, endpoint=None):
   """Bind a zeromq socket to an endpoint, specified or random TCP.
 
@@ -299,8 +300,8 @@ class ZeroMQListener(object):
     (task_id, exc_trace, exc_value) = data
     task = self._tasks[task_id]
     worker = task.worker
-    logger.debug("Worker {} task {} failed: {}".format(
-        worker.id, task.id, exc_value))
+    logger.debug("Worker {} task {} failed: {}".format(worker.id, task.id,
+                                                       exc_value))
     logger.debug("Stack trace: %s", exc_trace)
     worker.state_change(WorkerState.TASKCOMPLETE)
     worker.last_seen = time.time()

@@ -7,10 +7,13 @@ import sys
 
 import drmaa
 
+
 class Job(object):
   """Track information about cluster jobs"""
+
   def __init__(self, jobid):
     self.id = jobid
+
 
 class Pool(object):
   """Manage a pool of DRMAA workers"""

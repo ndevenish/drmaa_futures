@@ -15,6 +15,11 @@ from drmaa_futures.master import ZeroMQListener
 
 logger = logging.getLogger(__name__)
 
+def wait_until(condition, interval=0.1, timeout=1, *args):
+  """Simple convenience function to wait for a condition."""
+  start = time.time()
+  while not condition(*args) and time.time() - start < timeout:
+    time.sleep(interval)
 
 @pytest.fixture
 def master():
@@ -68,6 +73,8 @@ def slave(master):
 
 
 def test_worker_registered(master, slave):
+  # Since we could have lag here, explicitly wait for a bit to give time to connect
+  wait_until(lambda: master.active_workers, timeout=5)
   assert master.active_workers
 
 def test_task_enqueue(master, slave):

@@ -19,9 +19,10 @@ RUN su - sgeuser bash -c "pyenv install 3.5.5"
 RUN su - sgeuser bash -c "pyenv install 3.4.8"
 RUN su - sgeuser bash -c "pyenv install 2.7.14"
 RUN su - sgeuser bash -c "pyenv global 3.6.5 3.5.5 3.4.8 2.7.14 && pip3 install --upgrade pip tox"
+# Fix DRMAA settings
+RUN sed -if /etc/profile.d/sge_settings.sh -e "s;DRMAA_LIBRARY_PATH=/opt/sge/lib//libdrmaa.so;export DRMAA_LIBRARY_PATH=/opt/sge/lib/lx-amd64/libdrmaa.so;"
 
-
-RUN echo 'export DRMAA_LIBRARY_PATH=/opt/sge/lib/lx-amd64/libdrmaa.so' >> /etc/profile.d/drmaa.sh
+# RUN echo 'export DRMAA_LIBRARY_PATH=/opt/sge/lib/lx-amd64/libdrmaa.so' >> /etc/profile.d/drmaa.sh
 
 # eval "$(pyenv init -)"
 # eval "$(pyenv virtualenv-init -)"
